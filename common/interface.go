@@ -1,4 +1,4 @@
-package protocol
+package common
 
 type Key struct {
 	K string
@@ -10,6 +10,6 @@ type Entity struct {
 
 type Protocol interface {
 	Get(k Key) Entity
-	Insert(k Key, e Entity)
-	Remove(k Key)
+	Insert(k Key, e Entity) error
+	Remove(k Key) error
 }
