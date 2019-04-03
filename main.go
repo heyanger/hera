@@ -6,7 +6,9 @@ import (
 )
 
 func main() {
-	r := protocol.Raft{}
+	r := new(protocol.Raft)
 	s := service.Service{Protocol: r}
+
+	r.Init(true, "1")
 	s.Start()
 }

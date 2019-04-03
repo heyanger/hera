@@ -10,9 +10,9 @@ python3 heraclt.py delete key
 """
 
 def getValue(key):
-	path = url + "get" + key 
-	response = requests.get(path)
-	print(response.status_code)
+	payload = {"key": key}
+	response = requests.post(url, json=payload)
+	print(response.text)
 
 
 def putPair(key, value):

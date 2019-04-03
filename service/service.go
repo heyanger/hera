@@ -60,8 +60,6 @@ func (s *Service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case http.MethodGet:
-		w.WriteHeader(http.StatusOK)
 	case http.MethodPost:
 		s.postHandler(w, r)
 	case http.MethodPut:
@@ -74,7 +72,6 @@ func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
 // Start the instance and the HTTP web server
 func (s *Service) Start() {
 	http.HandleFunc("/", s.defaultHandler)
-	http.HandleFunc("/get", s.defaultHandler)
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
