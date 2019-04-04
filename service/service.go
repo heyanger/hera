@@ -70,10 +70,10 @@ func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Start the instance and the HTTP web server
-func (s *Service) Start() {
+func (s *Service) Start(port string) {
 	http.HandleFunc("/", s.defaultHandler)
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
 	}
 }

@@ -41,11 +41,13 @@ type Raft struct {
 // Init inits the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (r *Raft) Init(enableSingle bool, localID string) error {
+func (r *Raft) Init(nodes []string, localID string) error {
 	r.store = make(map[common.Key]common.Entity)
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
+
+	fmt.Println(r.RaftBind)
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", r.RaftBind)
@@ -77,17 +79,25 @@ func (r *Raft) Init(enableSingle bool, localID string) error {
 	}
 	r.raft = ra
 
-	if enableSingle {
-		configuration := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      config.LocalID,
-					Address: transport.LocalAddr(),
-				},
+	// if enableSingle {
+	configuration := raft.Configuration{
+		Servers: []raft.Server{
+			{
+				ID:      config.LocalID,
+				Address: transport.LocalAddr(),
 			},
-		}
-		ra.BootstrapCluster(configuration)
+		},
 	}
+	ra.BootstrapCluster(configuration)
+	// }
+
+	// c := make([]raft.Server, 0, len(nodes))
+	// for _, n := range nodes {
+	// 	c = append(c, raft.Server{Suffrage: raft.Voter, ID: raft.ServerID(n), Address: raft.ServerAddress(n)})
+	// }
+
+	// configuration := raft.Configuration{c}
+	// ra.BootstrapCluster(configuration)
 
 	return nil
 }
