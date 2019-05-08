@@ -1,0 +1,12 @@
+config:
+  server1:
+    clientport: 8080
+    protocolport: 8180
+
+  server2:
+    clientport: 8081
+    protocolport: 8181
+
+  server3:
+    clientport: 8082
+    protocolport: 8182

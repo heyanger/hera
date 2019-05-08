@@ -8,6 +8,17 @@ type Entity struct {
 	V string
 }
 
+type Node struct {
+	Source    string
+	Heartbeat uint64
+}
+
+type ServersConfig struct {
+	Servers map[string][]string
+	// Clientport   string
+	// Protocolport string
+}
+
 type Protocol interface {
 	Get(k Key) Entity
 	Insert(k Key, e Entity) error

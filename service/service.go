@@ -2,14 +2,22 @@ package service
 
 import (
 	"encoding/json"
+	"math/rand"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/funkytennisball/hera/common"
 )
 
+type NodeKey uint32
+
 // Service provides an HTTP service
 type Service struct {
 	Protocol common.Protocol
+
+	store map[common.Key]common.Entity
+	nodes map[NodeKey]common.Node
 }
 
 func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +66,51 @@ func (s *Service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Upon a new data node, this is
+func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
+	// TODO: Malicious heartbeat handling
+	m := map[string]string{}
+
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	keystr := m["key"]
+	i, err := strconv.Atoi(keystr)
+
+	if err != nil {
+		// Node does not exist, add new entry
+		key := NodeKey(rand.Uint64())
+		v := common.Node{
+			Source:    m["source"],
+			Heartbeat: uint64(time.Now().UnixNano() / 1000),
+		}
+		s.nodes[key] = v
+
+		w.Write([]byte(key))
+		return
+	}
+
+	key := NodeKey(i)
+
+	if _, ok := s.nodes[key]; ok {
+		// Node exists, update heartbeat
+		v := s.nodes[key]
+		v.Heartbeat = uint64(time.Now().UnixNano() / 1000)
+		s.nodes[key] = v
+	} else {
+		// Node does not exist, add new entry
+		key := NodeKey(rand.Uint64())
+		v := common.Node{
+			Source:    m["source"],
+			Heartbeat: uint64(time.Now().UnixNano() / 1000),
+		}
+		s.nodes[key] = v
+	}
+
+}
+
 func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -69,9 +122,20 @@ func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Service) heartbeatHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.heartbeat(w, r)
+	}
+}
+
 // Start the instance and the HTTP web server
 func (s *Service) Start(port string) {
+	s.store = make(map[common.Key]common.Entity)
+	s.nodes = make(map[NodeKey]common.Node)
+
 	http.HandleFunc("/", s.defaultHandler)
+	http.HandleFunc("/heartbeat", s.heartbeatHandler)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
