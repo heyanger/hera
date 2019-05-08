@@ -48,7 +48,7 @@ func main() {
 	// }
 	// fmt.Println(m)
 
-	r := new(protocol.SRaft)
+	r := new(protocol.Raft)
 	s := service.Service{Protocol: r}
 
 	r.Init([]string{"1", "2", "3"}, "1")

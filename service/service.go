@@ -88,7 +88,7 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		}
 		s.nodes[key] = v
 
-		w.Write([]byte(key))
+		// w.Write([]byte(key))
 		return
 	}
 
