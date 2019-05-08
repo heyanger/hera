@@ -20,14 +20,11 @@ type Config struct {
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage go run main.go 'configfile' 'servername'")
+	configFile := "./config.yaml"
 
-		return
+	if len(os.Args) >= 2 {
+		configFile = os.Args[1]
 	}
-
-	configFile := os.Args[1]
-	// serverName := os.Args[2]
 
 	dat, err := ioutil.ReadFile(configFile)
 
@@ -35,18 +32,9 @@ func main() {
 		fmt.Println("Cannot read file: " + configFile)
 	}
 
-	// m := common.ServersConfig{}
 	m := Config{}
-	// servers := []common.Servers{}
 
 	yaml.Unmarshal(dat, &m)
-
-	// for _, v := range m {
-	// 	// s := common.Servers{Id: k.(string), Address: v.([]interface{})["protocolport"].(string)}
-	// 	// servers = append(servers, s)
-	// 	fmt.Println(v)
-	// }
-	// fmt.Println(m)
 
 	r := new(protocol.Raft)
 	s := service.Service{Protocol: r}

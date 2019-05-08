@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"math/rand"
 	"net/http"
@@ -88,7 +89,9 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		}
 		s.nodes[key] = v
 
-		// w.Write([]byte(key))
+		b := make([]byte, 8)
+		binary.LittleEndian.PutUint64(b, uint64(key))
+		w.Write(b)
 		return
 	}
 
@@ -109,6 +112,10 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		s.nodes[key] = v
 	}
 
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(key))
+	w.Write(b)
+	return
 }
 
 func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
