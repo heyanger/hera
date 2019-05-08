@@ -25,6 +25,9 @@ type Range struct {
 	Size       uint64
 }
 
+type RangeMap map[RangeKey]Range
+type NodeMap map[NodeKey]Node
+
 type ServersConfig struct {
 	Servers map[string][]string
 	// Clientport   string

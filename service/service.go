@@ -16,8 +16,8 @@ type Service struct {
 	Protocol common.Protocol
 
 	store  map[common.Key]common.Entity
-	ranges map[common.RangeKey]common.Range
-	nodes  map[NodeKey]common.Node
+	ranges common.RangeMap
+	nodes  common.NodeMap
 }
 
 func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// Node does not exist, add new entry
-		key := NodeKey(rand.Uint64())
+		key := common.NodeKey(rand.Uint64())
 		v := common.Node{
 			Source:    m["source"],
 			Heartbeat: uint64(time.Now().UnixNano() / 1000),
@@ -94,7 +94,7 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := NodeKey(i)
+	key := common.NodeKey(i)
 
 	if _, ok := s.nodes[key]; ok {
 		// Node exists, update heartbeat
@@ -103,7 +103,7 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		s.nodes[key] = v
 	} else {
 		// Node does not exist, add new entry
-		key := NodeKey(rand.Uint64())
+		key := common.NodeKey(rand.Uint64())
 		v := common.Node{
 			Source:    m["source"],
 			Heartbeat: uint64(time.Now().UnixNano() / 1000),
@@ -138,7 +138,8 @@ func (s *Service) heartbeatHandler(w http.ResponseWriter, r *http.Request) {
 // Start the instance and the HTTP web server
 func (s *Service) Start(port string) {
 	s.store = make(map[common.Key]common.Entity)
-	s.nodes = make(map[NodeKey]common.Node)
+	s.nodes = make(common.NodeMap)
+	s.ranges = make(common.RangeMap)
 
 	http.HandleFunc("/", s.defaultHandler)
 	http.HandleFunc("/heartbeat", s.heartbeatHandler)
