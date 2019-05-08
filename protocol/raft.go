@@ -41,13 +41,21 @@ type Raft struct {
 // Init inits the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (r *Raft) Init(nodes []string, localID string) error {
+func (r *Raft) Init(localID string, bind string) error {
+	return r.setup(localID, bind, false, "", "")
+}
+
+func (r *Raft) Join(localID, bind string, joinid string, joinaddr string) error {
+	return r.setup(localID, bind, true, joinid, joinaddr)
+}
+
+func (r *Raft) setup(localID string, bind string, join bool, joinid string, joinaddr string) error {
 	r.store = make(map[common.Key]common.Entity)
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
 
-	fmt.Println(r.RaftBind)
+	r.RaftBind = "localhost:" + bind
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", r.RaftBind)
@@ -79,25 +87,23 @@ func (r *Raft) Init(nodes []string, localID string) error {
 	}
 	r.raft = ra
 
-	// if enableSingle {
-	configuration := raft.Configuration{
-		Servers: []raft.Server{
-			{
-				ID:      config.LocalID,
-				Address: transport.LocalAddr(),
+	if join {
+		f := r.raft.AddVoter(raft.ServerID(joinid), raft.ServerAddress(joinaddr), 0, 0)
+
+		if f.Error() != nil {
+			return f.Error()
+		}
+	} else {
+		configuration := raft.Configuration{
+			Servers: []raft.Server{
+				{
+					ID:      config.LocalID,
+					Address: transport.LocalAddr(),
+				},
 			},
-		},
+		}
+		ra.BootstrapCluster(configuration)
 	}
-	ra.BootstrapCluster(configuration)
-	// }
-
-	// c := make([]raft.Server, 0, len(nodes))
-	// for _, n := range nodes {
-	// 	c = append(c, raft.Server{Suffrage: raft.Voter, ID: raft.ServerID(n), Address: raft.ServerAddress(n)})
-	// }
-
-	// configuration := raft.Configuration{c}
-	// ra.BootstrapCluster(configuration)
 
 	return nil
 }
@@ -107,6 +113,20 @@ func (r Raft) Get(key common.Key) common.Entity {
 	// s.mu.Lock()
 	// defer s.mu.Unlock()
 	return r.store[key]
+}
+
+func (r Raft) State() string {
+	if r.raft != nil {
+		return r.raft.State().String()
+	}
+	return "Dead"
+}
+
+func (r Raft) Location() string {
+	if r.raft != nil {
+		return r.RaftBind
+	}
+	return ""
 }
 
 // Insert sets the value for the given key.

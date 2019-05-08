@@ -1,7 +1,5 @@
 package common
 
-type NodeKey uint32
-
 type Key struct {
 	K string
 }
@@ -13,6 +11,8 @@ type Entity struct {
 type Node struct {
 	Source    string
 	Heartbeat uint64
+	Location  string
+	Leader    bool
 }
 
 type RangeKey struct {
@@ -20,13 +20,13 @@ type RangeKey struct {
 }
 
 type Range struct {
-	Nodes      [3]NodeKey
-	RaftLeader NodeKey
-	Size       uint64
+	Nodes [3]string
+	Size  uint64
 }
 
 type RangeMap map[RangeKey]Range
-type NodeMap map[NodeKey]Node
+type NodeMap map[string]Node
+type Store map[string]string
 
 type ServersConfig struct {
 	Servers map[string][]string
@@ -38,6 +38,9 @@ type Protocol interface {
 	Get(k Key) Entity
 	Insert(k Key, e Entity) error
 	Remove(k Key) error
+	State() string
+	Location() string
 
-	Init(nodes []string, localID string) error
+	Init(id string, bind string) error
+	Join(localID, bind string, joinid string, joinaddr string) error
 }

@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/funkytennisball/hera/protocol"
 	"github.com/funkytennisball/hera/service"
 	"gopkg.in/yaml.v2"
 )
@@ -36,9 +35,6 @@ func main() {
 
 	yaml.Unmarshal(dat, &m)
 
-	r := new(protocol.Raft)
-	s := service.Service{Protocol: r}
-
-	r.Init([]string{"1", "2", "3"}, "1")
+	s := service.Service{}
 	s.Start("8080")
 }

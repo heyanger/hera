@@ -1,8 +1,10 @@
 package service
 
 import (
-	"encoding/binary"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -13,11 +15,10 @@ import (
 
 // Service provides an HTTP service
 type Service struct {
-	Protocol common.Protocol
-
-	store  map[common.Key]common.Entity
 	ranges common.RangeMap
 	nodes  common.NodeMap
+
+	leader common.NodeKey
 }
 
 func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,8 +29,14 @@ func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: error handling
-	w.Write([]byte(s.Protocol.Get(common.Key{K: m["key"]}).V))
+	notify := map[string]string{}
+	notify["key"] = m["key"]
+
+	resp := s.request(s.getLeaderSource(), "/get", notify)
+
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	w.Write([]byte(body))
 }
 
 func (s *Service) putHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,13 +47,17 @@ func (s *Service) putHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: error handling
-	if err := s.Protocol.Insert(common.Key{K: m["key"]}, common.Entity{V: m["value"]}); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	notify := map[string]string{}
+	notify["key"] = m["key"]
+	notify["value"] = m["value"]
+
+	s.request(s.getLeaderSource(), "/put", notify)
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Service) getLeaderSource() string {
+	return s.nodes[s.leader].Source
 }
 
 func (s *Service) deleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,13 +68,39 @@ func (s *Service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: error handling
-	if err := s.Protocol.Remove(common.Key{K: m["key"]}); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Service) newNode(m map[string]string) map[string]string {
+	res := make(map[string]string)
+
+	isGenesis := len(s.nodes) == 0
+
+	id := rand.Uint64()
+	key := common.NodeKey(id)
+	v := common.Node{
+		Source:    m["source"],
+		Heartbeat: uint64(time.Now().UnixNano() / 1000),
+	}
+	s.nodes[key] = v
+
+	res["id"] = strconv.FormatUint(id, 10)
+	res["genesis"] = strconv.FormatBool(isGenesis)
+	res["source"] = m["source"]
+
+	if s.leader != 0 {
+		res["leaderid"] = strconv.FormatUint(uint64(s.leader), 10)
+		res["leaderaddr"] = s.nodes[s.leader].Location
 	}
 
-	w.WriteHeader(http.StatusOK)
+	return res
+}
+
+func (s *Service) request(leader string, path string, values map[string]string) *http.Response {
+	jsonValue, _ := json.Marshal(values)
+	resp, _ := http.Post(leader+path, "application/json", bytes.NewBuffer(jsonValue))
+
+	return resp
 }
 
 // Upon a new data node, this is
@@ -81,16 +118,9 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		// Node does not exist, add new entry
-		key := common.NodeKey(rand.Uint64())
-		v := common.Node{
-			Source:    m["source"],
-			Heartbeat: uint64(time.Now().UnixNano() / 1000),
-		}
-		s.nodes[key] = v
-
-		b := make([]byte, 8)
-		binary.LittleEndian.PutUint64(b, uint64(key))
-		w.Write(b)
+		jData, _ := json.Marshal(s.newNode(m))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jData)
 		return
 	}
 
@@ -100,21 +130,31 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		// Node exists, update heartbeat
 		v := s.nodes[key]
 		v.Heartbeat = uint64(time.Now().UnixNano() / 1000)
+		v.Source = m["source"]
+		v.Location = m["location"]
+		v.Leader, _ = strconv.ParseBool(m["leader"])
 		s.nodes[key] = v
+
+		res := make(map[string]string)
+
+		if v.Leader {
+			s.leader = key
+
+			res["leaderid"] = strconv.FormatUint(uint64(s.leader), 10)
+			res["leaderaddr"] = s.nodes[s.leader].Location
+		}
+
+		jData, _ := json.Marshal(res)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jData)
+		return
 	} else {
 		// Node does not exist, add new entry
-		key := common.NodeKey(rand.Uint64())
-		v := common.Node{
-			Source:    m["source"],
-			Heartbeat: uint64(time.Now().UnixNano() / 1000),
-		}
-		s.nodes[key] = v
+		jData, _ := json.Marshal(s.newNode(m))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jData)
+		return
 	}
-
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(key))
-	w.Write(b)
-	return
 }
 
 func (s *Service) defaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -137,12 +177,13 @@ func (s *Service) heartbeatHandler(w http.ResponseWriter, r *http.Request) {
 
 // Start the instance and the HTTP web server
 func (s *Service) Start(port string) {
-	s.store = make(map[common.Key]common.Entity)
 	s.nodes = make(common.NodeMap)
 	s.ranges = make(common.RangeMap)
 
 	http.HandleFunc("/", s.defaultHandler)
 	http.HandleFunc("/heartbeat", s.heartbeatHandler)
+
+	fmt.Println("Main Server Started on port: " + port)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
