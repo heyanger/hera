@@ -27,7 +27,7 @@ type DataNode struct {
 // Init starts the Data Node
 func (d *DataNode) Init(port string, raftport string) {
 	d.Protocol = new(protocol.Raft)
-	d.source = "http://localhost:" + port
+	d.source = "http://127.0.0.1:" + port
 
 	notify := make(map[string]string)
 	notify["source"] = d.source
@@ -48,9 +48,14 @@ func (d *DataNode) Init(port string, raftport string) {
 	d.id = id
 
 	if isGenesis {
-		d.Protocol.Init(id, raftport)
+		d.Protocol.Init(id, raftport, true)
 	} else {
-		d.Protocol.Join(id, raftport, m["leaderid"], m["leaderaddr"])
+		n := make(map[string]string)
+		n["id"] = id
+		n["source"] = "127.0.0.1:" + raftport
+
+		d.Protocol.Init(id, raftport, false)
+		d.extrequest(m["leadersource"], "/join", n)
 	}
 
 	d.heartbeat()
@@ -58,6 +63,7 @@ func (d *DataNode) Init(port string, raftport string) {
 	http.HandleFunc("/get", d.get)
 	http.HandleFunc("/put", d.put)
 	http.HandleFunc("/delete", d.delete)
+	http.HandleFunc("/join", d.join)
 
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
@@ -80,7 +86,7 @@ func (d *DataNode) heartbeat() {
 				d.request("/heartbeat", notify)
 
 				// resp := d.request("/heartbeat", notify)
-				// Printing
+				// // Printing
 				// body, _ := ioutil.ReadAll(resp.Body)
 				// m := make(map[string]string)
 				// json.Unmarshal(body, &m)
@@ -135,9 +141,29 @@ func (d *DataNode) delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (d *DataNode) join(w http.ResponseWriter, r *http.Request) {
+	m := map[string]string{}
+
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	d.Protocol.Join(m["id"], m["source"])
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (d *DataNode) request(path string, values map[string]string) *http.Response {
 	jsonValue, _ := json.Marshal(values)
 	resp, _ := http.Post(d.Service+path, "application/json", bytes.NewBuffer(jsonValue))
+
+	return resp
+}
+
+func (d *DataNode) extrequest(source string, path string, values map[string]string) *http.Response {
+	jsonValue, _ := json.Marshal(values)
+	resp, _ := http.Post(source+path, "application/json", bytes.NewBuffer(jsonValue))
 
 	return resp
 }

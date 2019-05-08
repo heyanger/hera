@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/funkytennisball/hera/common"
@@ -18,7 +19,7 @@ type Service struct {
 	ranges common.RangeMap
 	nodes  common.NodeMap
 
-	leader common.NodeKey
+	leader string
 }
 
 func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ func (s *Service) newNode(m map[string]string) map[string]string {
 	isGenesis := len(s.nodes) == 0
 
 	id := rand.Uint64()
-	key := common.NodeKey(id)
+	key := strconv.FormatUint(id, 10)
 	v := common.Node{
 		Source:    m["source"],
 		Heartbeat: uint64(time.Now().UnixNano() / 1000),
@@ -88,9 +89,10 @@ func (s *Service) newNode(m map[string]string) map[string]string {
 	res["genesis"] = strconv.FormatBool(isGenesis)
 	res["source"] = m["source"]
 
-	if s.leader != 0 {
-		res["leaderid"] = strconv.FormatUint(uint64(s.leader), 10)
+	if strings.Compare(s.leader, "") != 0 {
+		res["leaderid"] = s.leader
 		res["leaderaddr"] = s.nodes[s.leader].Location
+		res["leadersource"] = s.nodes[s.leader].Source
 	}
 
 	return res
@@ -114,9 +116,8 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keystr := m["key"]
-	i, err := strconv.Atoi(keystr)
 
-	if err != nil {
+	if strings.Compare(keystr, "") == 0 {
 		// Node does not exist, add new entry
 		jData, _ := json.Marshal(s.newNode(m))
 		w.Header().Set("Content-Type", "application/json")
@@ -124,7 +125,7 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := common.NodeKey(i)
+	key := keystr
 
 	if _, ok := s.nodes[key]; ok {
 		// Node exists, update heartbeat
@@ -140,8 +141,9 @@ func (s *Service) heartbeat(w http.ResponseWriter, r *http.Request) {
 		if v.Leader {
 			s.leader = key
 
-			res["leaderid"] = strconv.FormatUint(uint64(s.leader), 10)
+			res["leaderid"] = s.leader
 			res["leaderaddr"] = s.nodes[s.leader].Location
+			res["leadersource"] = s.nodes[s.leader].Source
 		}
 
 		jData, _ := json.Marshal(res)
@@ -179,6 +181,8 @@ func (s *Service) heartbeatHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Service) Start(port string) {
 	s.nodes = make(common.NodeMap)
 	s.ranges = make(common.RangeMap)
+
+	s.ranges[common.RangeKey{"", ""}] = common.Range{[]string{}, 0}
 
 	http.HandleFunc("/", s.defaultHandler)
 	http.HandleFunc("/heartbeat", s.heartbeatHandler)

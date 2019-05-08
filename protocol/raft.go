@@ -41,21 +41,13 @@ type Raft struct {
 // Init inits the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (r *Raft) Init(localID string, bind string) error {
-	return r.setup(localID, bind, false, "", "")
-}
-
-func (r *Raft) Join(localID, bind string, joinid string, joinaddr string) error {
-	return r.setup(localID, bind, true, joinid, joinaddr)
-}
-
-func (r *Raft) setup(localID string, bind string, join bool, joinid string, joinaddr string) error {
+func (r *Raft) Init(localID string, bind string, genesis bool) error {
 	r.store = make(map[common.Key]common.Entity)
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
 
-	r.RaftBind = "localhost:" + bind
+	r.RaftBind = "127.0.0.1:" + bind
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", r.RaftBind)
@@ -87,13 +79,7 @@ func (r *Raft) setup(localID string, bind string, join bool, joinid string, join
 	}
 	r.raft = ra
 
-	if join {
-		f := r.raft.AddVoter(raft.ServerID(joinid), raft.ServerAddress(joinaddr), 0, 0)
-
-		if f.Error() != nil {
-			return f.Error()
-		}
-	} else {
+	if genesis {
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
 				{
@@ -105,6 +91,18 @@ func (r *Raft) setup(localID string, bind string, join bool, joinid string, join
 		ra.BootstrapCluster(configuration)
 	}
 
+	return nil
+}
+
+func (r *Raft) Join(nodeID string, addr string) error {
+	fmt.Println("received join for remote node %s from %s", nodeID, addr)
+
+	f := r.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 0)
+	if f.Error() != nil {
+		return f.Error()
+	}
+
+	fmt.Println("Join node %s at %s successful", nodeID, addr)
 	return nil
 }
 

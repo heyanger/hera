@@ -20,7 +20,7 @@ type RangeKey struct {
 }
 
 type Range struct {
-	Nodes [3]string
+	Nodes []string
 	Size  uint64
 }
 
@@ -41,6 +41,6 @@ type Protocol interface {
 	State() string
 	Location() string
 
-	Init(id string, bind string) error
-	Join(localID, bind string, joinid string, joinaddr string) error
+	Init(id string, bind string, genesis bool) error
+	Join(nodeid string, addr string) error
 }
