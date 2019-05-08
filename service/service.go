@@ -11,14 +11,13 @@ import (
 	"github.com/funkytennisball/hera/common"
 )
 
-type NodeKey uint32
-
 // Service provides an HTTP service
 type Service struct {
 	Protocol common.Protocol
 
-	store map[common.Key]common.Entity
-	nodes map[NodeKey]common.Node
+	store  map[common.Key]common.Entity
+	ranges map[common.RangeKey]common.Range
+	nodes  map[NodeKey]common.Node
 }
 
 func (s *Service) postHandler(w http.ResponseWriter, r *http.Request) {
