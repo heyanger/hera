@@ -16,7 +16,8 @@ type Node struct {
 }
 
 type RangeKey struct {
-	Start, End string
+	Start, End   string
+	RingLocation uint64
 }
 
 type Range struct {
